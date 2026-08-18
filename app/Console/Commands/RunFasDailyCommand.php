@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\FasExecutionRun;
 use App\Services\Orchestration\FasDailyOrchestrator;
+use App\Services\OpenRouter\OpenRouterResearchService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -13,7 +14,7 @@ class RunFasDailyCommand extends Command
 
     protected $description = 'Executa o pipeline completo do FAS para uma data (Fixtures -> Datasets -> Analysis -> Ranking).';
 
-    public function handle(FasDailyOrchestrator $orchestrator)
+    public function handle(FasDailyOrchestrator $orchestrator, OpenRouterResearchService $researchService)
     {
         $dateStr = $this->argument('date') ?? now()->format('Y-m-d');
         $date = Carbon::parse($dateStr);
@@ -22,17 +23,15 @@ class RunFasDailyCommand extends Command
             $this->info('Force mode enabled.');
         }
 
-        $run = FasExecutionRun::firstOrCreate(
-            [
-                'execution_type' => 'DAILY_ANALYSIS',
-                'analysis_date' => $date->format('Y-m-d'),
-                'status' => 'PENDING',
-            ]
-        );
+        $run = FasExecutionRun::create([
+            'execution_type' => 'DAILY_ANALYSIS',
+            'analysis_date' => $date->format('Y-m-d'),
+            'status' => 'PENDING',
+        ]);
 
         $this->info("Iniciando FasDailyOrchestrator para {$date->format('Y-m-d')}...");
 
-        $orchestrator->execute($run);
+        $orchestrator->execute($run, $researchService);
 
         // Refresh to get final status
         $run->refresh();
@@ -41,13 +40,15 @@ class RunFasDailyCommand extends Command
             $this->info('Execução concluída com sucesso!');
             $this->line('Resumo:');
             foreach ($run->summary as $key => $val) {
-                $this->line(" - {$key}: {$val}");
+                $this->line(' - '.$key.': '.(is_array($val) ? json_encode($val, JSON_UNESCAPED_UNICODE) : $val));
             }
         } else {
             $this->error("A execução falhou ou terminou com status: {$run->status}");
             if ($run->errors) {
                 foreach ($run->errors as $error) {
-                    $this->error("[{$error['step']}] {$error['message']}");
+                    $step = $error['step'] ?? 'unknown';
+                    $message = $error['message'] ?? json_encode($error, JSON_UNESCAPED_UNICODE);
+                    $this->error("[{$step}] {$message}");
                 }
             }
         }

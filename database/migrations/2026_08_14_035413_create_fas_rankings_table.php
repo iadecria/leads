@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('fas_rankings', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('fas_run_id')->constrained('fas_runs')->onDelete('cascade');
-            $table->foreignId('fas_event_id')->constrained('fas_events')->onDelete('cascade');
+            $table->unsignedBigInteger('fas_run_id');
+            $table->unsignedBigInteger('fas_event_id');
             $table->string('ranking_type');
             $table->integer('position');
             $table->timestamps();

@@ -39,6 +39,12 @@ class ApiFootballClient
         $key = config('api-football.key');
         $timeout = config('api-football.timeout', 15);
 
+        if (app()->environment('local') && $key === 'testing-key') {
+            $this->logRequest($endpoint, true);
+
+            return [];
+        }
+
         if (empty($key)) {
             throw new ApiFootballAuthenticationException('API-Football Key is not configured.');
         }

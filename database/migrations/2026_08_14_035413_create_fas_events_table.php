@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('fas_events', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('fas_analysis_id')->constrained('fas_analyses')->onDelete('cascade');
+            $table->unsignedBigInteger('fas_analysis_id');
             $table->string('event_type');
             $table->decimal('line', 5, 2)->nullable();
             $table->decimal('estimated_probability', 5, 2)->nullable();

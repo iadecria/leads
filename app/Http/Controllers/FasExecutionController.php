@@ -27,10 +27,17 @@ class FasExecutionController extends Controller
         $request->validate(['date' => 'required|date']);
         $date = Carbon::parse($request->date);
 
+        if ($date->isPast() && ! $date->isToday()) {
+            return response()->json([
+                'error' => 'Análises pré-jogo só podem ser geradas para hoje ou datas futuras.',
+            ], 422);
+        }
+
         // Bloquear run concorrente
         $existing = FasExecutionRun::where('execution_type', 'DAILY_ANALYSIS')
             ->whereDate('analysis_date', $date->format('Y-m-d'))
             ->where('status', 'RUNNING')
+            ->where('updated_at', '>=', now()->subMinute())
             ->first();
 
         if ($existing) {
@@ -43,7 +50,7 @@ class FasExecutionController extends Controller
             'status' => 'PENDING',
         ]);
 
-        RunFasDailyPipelineJob::dispatch($run);
+        RunFasDailyPipelineJob::dispatchSync($run);
 
         return response()->json(['message' => 'Execução iniciada', 'run_id' => $run->id]);
     }
@@ -57,10 +64,16 @@ class FasExecutionController extends Controller
             return response()->json(['error' => 'Não há resultados a conferir para uma data futura.'], 422);
         }
 
+        $rankingExists = \App\Models\FasRankingRun::whereDate('analysis_date', $date->format('Y-m-d'))->exists();
+        if (! $rankingExists) {
+            return response()->json(['error' => 'Nenhuma análise foi gerada para esta data.'], 422);
+        }
+
         // Bloquear run concorrente
         $existing = FasExecutionRun::where('execution_type', 'RESULT_AUDIT')
             ->whereDate('analysis_date', $date->format('Y-m-d'))
             ->where('status', 'RUNNING')
+            ->where('updated_at', '>=', now()->subMinute())
             ->first();
 
         if ($existing) {
@@ -73,7 +86,7 @@ class FasExecutionController extends Controller
             'status' => 'PENDING',
         ]);
 
-        RunFasAuditPipelineJob::dispatch($run);
+        RunFasAuditPipelineJob::dispatchSync($run);
 
         return response()->json(['message' => 'Auditoria iniciada', 'run_id' => $run->id]);
     }

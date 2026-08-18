@@ -45,7 +45,7 @@ class FasBuildDataset extends Command
 
         foreach ($fixtures as $fixture) {
             $this->info("Dispatching job for fixture ID: {$fixture->id}");
-            BuildMatchDatasetJob::dispatch($fixture, $force, $syncMissing);
+            BuildMatchDatasetJob::dispatchSync($fixture, $force, $syncMissing);
         }
 
         $this->info('Jobs dispatched successfully.');

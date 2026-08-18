@@ -17,8 +17,8 @@ class DashboardTest extends TestCase
         $response = $this->actingAs($user)->get('/dashboard');
 
         $response->assertStatus(200);
-        $response->assertSee('Orquestração de Rotina');
-        $response->assertSee('Executar FAS');
-        $response->assertSee('Conferir Resultados');
+        $response->assertSee('FAS');
+        $response->assertSee('GERAR ANÁLISE');
+        $response->assertSee('CONFERIR ANÁLISE');
     }
 }

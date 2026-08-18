@@ -4,12 +4,14 @@ namespace App\Services\Dataset;
 
 use App\DTOs\Dataset\MatchDataset;
 use App\DTOs\Dataset\TeamStats;
+use App\DTOs\ResearchFixtureResult;
 use App\Models\Fixture;
 use App\Models\MatchDatasetRecord;
 use App\Services\Dataset\Calculators\DataQualityCalculator;
 use App\Services\Dataset\Calculators\H2HCalculator;
 use App\Services\Dataset\Calculators\RestCalculator;
 use App\Services\Dataset\Calculators\StatsCalculator;
+use App\Services\Research\ResearchDatasetAdapter;
 use Carbon\Carbon;
 
 class MatchDatasetBuilder
@@ -18,8 +20,69 @@ class MatchDatasetBuilder
         protected StatsCalculator $statsCalculator,
         protected DataQualityCalculator $qualityCalculator,
         protected H2HCalculator $h2hCalculator,
-        protected RestCalculator $restCalculator
+        protected RestCalculator $restCalculator,
+        protected ResearchDatasetAdapter $researchDatasetAdapter
     ) {}
+
+    public function buildFromResearch(Fixture $fixture, ResearchFixtureResult|array $researchResult, bool $force = false): MatchDatasetRecord
+    {
+        $cutoffAt = $fixture->fixture_date;
+        $normalized = $this->researchDatasetAdapter->normalize(
+            $researchResult,
+            $fixture->homeTeam->name ?? '',
+            $fixture->awayTeam->name ?? '',
+            $cutoffAt->toIso8601String()
+        );
+
+        $dataset = new MatchDataset;
+        $dataset->datasetVersion = config('fas.dataset_version');
+        $dataset->fixture = $fixture->toArray();
+        $dataset->homeTeam = $fixture->homeTeam->toArray();
+        $dataset->awayTeam = $fixture->awayTeam->toArray();
+        $dataset->homeStats = $normalized['home_stats'];
+        $dataset->awayStats = $normalized['away_stats'];
+        $dataset->headToHead = [];
+        $dataset->rest = [];
+        $dataset->standings = [];
+        $dataset->injuries = [];
+        $dataset->coverage = [];
+        $dataset->dataQuality = $this->qualityCalculator->calculate([
+            'historical_fixtures' => $normalized['home_recent_matches']->count() + $normalized['away_recent_matches']->count(),
+            'home_away_sample' => $normalized['home_home_matches']->count() + $normalized['away_away_matches']->count(),
+            'head_to_head_count' => 0,
+            'has_fixture_statistics' => false,
+            'has_events' => false,
+            'has_standings' => false,
+            'has_injuries' => false,
+            'has_lineups' => false,
+            'coverage_completeness' => 0,
+        ]);
+        $dataset->trace = array_merge($normalized['trace'], [
+            'mode' => 'research_only',
+            'home_recent_matches' => $normalized['home_recent_matches']->count(),
+            'away_recent_matches' => $normalized['away_recent_matches']->count(),
+        ]);
+
+        $payload = [
+            'fixture_id' => $fixture->id,
+            'dataset_version' => $dataset->datasetVersion,
+            'generated_at' => now(),
+            'cutoff_at' => $cutoffAt,
+            'data_quality_score' => $dataset->dataQuality['score'],
+            'data_quality_level' => $dataset->dataQuality['level'],
+            'payload' => $dataset->jsonSerialize(),
+        ];
+
+        return $force
+            ? MatchDatasetRecord::create($payload)
+            : MatchDatasetRecord::updateOrCreate(
+                [
+                    'fixture_id' => $fixture->id,
+                    'dataset_version' => $dataset->datasetVersion,
+                ],
+                $payload
+            );
+    }
 
     public function build(Fixture $fixture, bool $force = false): MatchDatasetRecord
     {

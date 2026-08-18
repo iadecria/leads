@@ -19,6 +19,10 @@ class FasSyncFixtures extends Command
         try {
             $count = $syncService->syncByDate($date);
             $this->info("Successfully synced {$count} fixtures.");
+
+            if ($count === 0) {
+                $this->warn('No fixtures were returned for this date. The free plan may not have coverage for the requested leagues.');
+            }
         } catch (\Exception $e) {
             $this->error('Failed to sync: '.$e->getMessage());
 

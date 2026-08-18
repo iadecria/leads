@@ -3,6 +3,11 @@
 namespace App\Services\Orchestration;
 
 use App\Models\FasExecutionRun;
+use App\Models\FasAnalysis;
+use App\Models\MatchDatasetRecord;
+use App\Models\FasRankingRun;
+use App\Models\Fixture;
+use App\Services\OpenRouter\OpenRouterResearchService;
 use Exception;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
@@ -12,7 +17,7 @@ class FasDailyOrchestrator
     /**
      * Executes the daily pipeline for a specific run.
      */
-    public function execute(FasExecutionRun $run): void
+    public function execute(FasExecutionRun $run, ?OpenRouterResearchService $researchService = null): void
     {
         // 1. Lock check
         if ($this->isAnotherRunActive($run)) {
@@ -31,8 +36,39 @@ class FasDailyOrchestrator
             $date = $run->analysis_date->format('Y-m-d');
             $summary = $run->summary ?? [];
 
+            if ($researchService) {
+                $run->update(['current_step' => 'research']);
+                try {
+                    $discovery = $researchService->discoverAndSyncFixtures($date);
+                    $researchResults = $researchService->researchDate($date);
+                    $summary['research_discovery'] = $discovery;
+                    $summary['research_results'] = $researchResults;
+                    $summary['research_count'] = count($researchResults);
+                    $summary['research_mode'] = 'openrouter';
+                    $summary['fixtures_eligible'] = count($discovery['synced'] ?? []);
+                    $summary['fixtures_found'] = count($discovery['synced'] ?? []);
+                    $run->update(['summary' => $summary]);
+
+                    if (($summary['fixtures_found'] ?? 0) === 0) {
+                        $summary['notice'] = 'Nenhum jogo foi encontrado para esta data.';
+                        $run->update([
+                            'status' => 'COMPLETED',
+                            'finished_at' => now(),
+                            'current_step' => 'done',
+                            'summary' => $summary,
+                        ]);
+
+                        return;
+                    }
+                } catch (Exception $e) {
+                    $summary['research_mode'] = 'fallback';
+                    $summary['research_error'] = $e->getMessage();
+                    $run->update(['summary' => $summary]);
+                }
+            }
+
             // Step 1: Sync Fixtures
-            if ($run->fixtures_status !== 'COMPLETED') {
+            if ($run->fixtures_status !== 'COMPLETED' && ! $researchService) {
                 $run->update(['current_step' => 'fixtures']);
                 $exitCode = Artisan::call('fas:sync-fixtures', ['date' => $date]);
 
@@ -48,6 +84,19 @@ class FasDailyOrchestrator
                 $summary['fixtures_found'] = isset($matchesFound[1]) ? (int) $matchesFound[1] : 0;
 
                 $run->update(['fixtures_status' => 'COMPLETED', 'summary' => $summary]);
+
+                if (($summary['fixtures_found'] ?? 0) === 0) {
+                    $summary['notice'] = 'Nenhum jogo foi encontrado para esta data no plano atual da API.';
+
+                    $run->update([
+                        'status' => 'COMPLETED',
+                        'finished_at' => now(),
+                        'current_step' => 'done',
+                        'summary' => $summary,
+                    ]);
+
+                    return;
+                }
             }
 
             // Step 2: Build Datasets
@@ -59,9 +108,12 @@ class FasDailyOrchestrator
                     throw new Exception("fas:build-dataset failed with exit code {$exitCode}");
                 }
 
-                $output = Artisan::output();
-                preg_match('/Gerados:\s*(\d+)/', $output, $matches);
-                $summary['datasets_generated'] = isset($matches[1]) ? (int) $matches[1] : 0;
+                $fixtureIds = Fixture::whereDate('fixture_date', $date)->pluck('id');
+                $summary['datasets_generated'] = MatchDatasetRecord::whereIn('fixture_id', $fixtureIds)
+                    ->when($run->started_at, function ($query) use ($run) {
+                        $query->whereBetween('generated_at', [$run->started_at, now()]);
+                    })
+                    ->count();
 
                 $run->update(['datasets_status' => 'COMPLETED', 'summary' => $summary]);
             }
@@ -75,9 +127,12 @@ class FasDailyOrchestrator
                     throw new Exception("fas:analyze failed with exit code {$exitCode}");
                 }
 
-                $output = Artisan::output();
-                preg_match('/Total Analyzed:\s*(\d+)/', $output, $matches);
-                $summary['analyses_generated'] = isset($matches[1]) ? (int) $matches[1] : 0;
+                $fixtureIds = Fixture::whereDate('fixture_date', $date)->pluck('id');
+                $summary['analyses_generated'] = FasAnalysis::whereIn('fixture_id', $fixtureIds)
+                    ->when($run->started_at, function ($query) use ($run) {
+                        $query->whereBetween('created_at', [$run->started_at, now()]);
+                    })
+                    ->count();
 
                 $run->update(['analysis_status' => 'COMPLETED', 'summary' => $summary]);
             }
@@ -91,16 +146,32 @@ class FasDailyOrchestrator
                     throw new Exception("fas:rank failed with exit code {$exitCode}");
                 }
 
-                $output = Artisan::output();
-                preg_match('/TOP 3:\s*(\d+)/', $output, $top3Matches);
-                preg_match('/TOP 5:\s*(\d+)/', $output, $top5Matches);
-                preg_match('/Watchlist:\s*(\d+)/', $output, $watchlistMatches);
-
-                $summary['top3_count'] = isset($top3Matches[1]) ? (int) $top3Matches[1] : 0;
-                $summary['top5_count'] = isset($top5Matches[1]) ? (int) $top5Matches[1] : 0;
-                $summary['watchlist_count'] = isset($watchlistMatches[1]) ? (int) $watchlistMatches[1] : 0;
+                $rankingRun = FasRankingRun::whereDate('analysis_date', $date)->latest('generated_at')->first();
+                if ($rankingRun) {
+                    $summary['top3_count'] = $rankingRun->rankings()->where('ranking_type', 'TOP3')->count();
+                    $summary['top5_count'] = $rankingRun->rankings()->where('ranking_type', 'TOP5')->count();
+                    $summary['watchlist_count'] = $rankingRun->rankings()->where('ranking_type', 'WATCHLIST')->count();
+                }
 
                 $run->update(['ranking_status' => 'COMPLETED', 'summary' => $summary]);
+            }
+
+            $rankingRun = FasRankingRun::with([
+                'rankings.event.analysis.fixture.homeTeam',
+                'rankings.event.analysis.fixture.awayTeam',
+            ])
+                ->whereDate('analysis_date', $date)
+                ->latest('generated_at')
+                ->first();
+
+            if ($rankingRun) {
+                $summary['selected_games'] = [
+                    'top3' => $this->serializeRankings($rankingRun, 'TOP3'),
+                    'top5' => $this->serializeRankings($rankingRun, 'TOP5'),
+                    'watchlist' => $this->serializeRankings($rankingRun, 'WATCHLIST'),
+                ];
+
+                $run->update(['summary' => $summary]);
             }
 
             // Finish
@@ -137,6 +208,7 @@ class FasDailyOrchestrator
             ->whereDate('analysis_date', $run->analysis_date)
             ->where('id', '!=', $run->id)
             ->where('status', 'RUNNING')
+            ->where('updated_at', '>=', now()->subMinute())
             ->exists();
     }
 
@@ -147,5 +219,26 @@ class FasDailyOrchestrator
             'finished_at' => now(),
             'errors' => [['message' => $message, 'time' => now()->toDateTimeString()]],
         ]);
+    }
+
+    private function serializeRankings(FasRankingRun $rankingRun, string $type): array
+    {
+        return $rankingRun->rankings
+            ->where('ranking_type', $type)
+            ->map(function ($ranking) {
+                $fixture = $ranking->event?->analysis?->fixture;
+
+                return [
+                    'ranking_id' => $ranking->id,
+                    'fixture_id' => $fixture?->id,
+                    'home_team' => $fixture?->homeTeam?->name,
+                    'away_team' => $fixture?->awayTeam?->name,
+                    'competition' => $fixture?->competition?->name,
+                    'candidate_score' => $ranking->candidate_score,
+                    'watchlist_reason' => $ranking->watchlist_reason,
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

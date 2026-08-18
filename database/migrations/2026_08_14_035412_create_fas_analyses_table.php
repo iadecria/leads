@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('fas_analyses', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('fas_run_id')->nullable()->constrained('fas_runs')->onDelete('cascade');
-            $table->foreignId('fixture_id')->constrained('fixtures')->onDelete('cascade');
+            $table->unsignedBigInteger('fas_run_id')->nullable();
+            $table->unsignedBigInteger('fixture_id');
             $table->integer('fii_score')->nullable();
             $table->integer('data_quality_score')->nullable();
             $table->decimal('home_win_probability', 5, 2)->nullable();

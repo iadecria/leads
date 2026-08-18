@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\FasExecutionRun;
 use App\Services\Orchestration\FasDailyOrchestrator;
+use App\Services\OpenRouter\OpenRouterResearchService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -23,8 +24,8 @@ class RunFasDailyPipelineJob implements ShouldQueue
         $this->run = $run;
     }
 
-    public function handle(FasDailyOrchestrator $orchestrator): void
+    public function handle(FasDailyOrchestrator $orchestrator, OpenRouterResearchService $researchService): void
     {
-        $orchestrator->execute($this->run);
+        $orchestrator->execute($this->run, $researchService);
     }
 }

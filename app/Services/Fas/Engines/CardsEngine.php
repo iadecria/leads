@@ -53,7 +53,7 @@ class CardsEngine implements EventEngineInterface
 
             if ($sampleStrength === 'INSUFFICIENT' || count($components) === 0) {
                 $predictions[] = new EventPrediction(
-                    event_type: 'CARDS_OVER',
+                    event_type: 'OVER_CARDS',
                     line: $line,
                     raw_probability: null,
                     adjusted_probability: null,
@@ -87,7 +87,7 @@ class CardsEngine implements EventEngineInterface
             $fasScore = $this->scoreCalculator->calculate($adjustedProbability, $confidence, $dataset->dataQuality['score'], $agreement);
 
             $predictions[] = new EventPrediction(
-                event_type: 'CARDS_OVER',
+                event_type: 'OVER_CARDS',
                 line: $line,
                 raw_probability: round($rawProbability, 4),
                 adjusted_probability: round($adjustedProbability, 4),

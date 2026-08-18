@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('fas_audits', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('fas_event_id')->constrained('fas_events')->onDelete('cascade');
+            $table->unsignedBigInteger('fas_event_id');
             $table->string('status')->default('PENDING');
             $table->string('result_value')->nullable();
             $table->boolean('is_correct')->nullable();

@@ -52,10 +52,6 @@ class FasEngine
             }
 
             foreach ($allPredictions as $prediction) {
-                if ($prediction->sample_strength === 'INSUFFICIENT' && $prediction->adjusted_probability === null) {
-                    continue; // Do not persist completely insufficient predictions unless debugging
-                }
-
                 FasEvent::create([
                     'fas_analysis_id' => $analysis->id,
                     'event_type' => $prediction->event_type,

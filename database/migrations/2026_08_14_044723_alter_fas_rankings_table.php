@@ -9,10 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('fas_rankings', function (Blueprint $table) {
-            $table->dropForeign(['fas_run_id']);
             $table->dropColumn('fas_run_id');
-
-            $table->foreignId('fas_ranking_run_id')->constrained('fas_ranking_runs')->onDelete('cascade');
+            $table->unsignedBigInteger('fas_ranking_run_id');
 
             $table->decimal('candidate_score', 5, 2)->nullable();
             $table->json('penalties')->nullable();
