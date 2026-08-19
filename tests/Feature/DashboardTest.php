@@ -18,7 +18,8 @@ class DashboardTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertSee('FAS');
-        $response->assertSee('GERAR ANÁLISE');
-        $response->assertSee('CONFERIR ANÁLISE');
+        $response->assertSee('BUSCAR JOGOS DO DIA');
+        $response->assertSee('RODAR FAS');
+        $response->assertSee('CONFERIR');
     }
 }

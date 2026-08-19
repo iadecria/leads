@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\ConfidenceLevel;
 use App\Enums\RankingType;
+use App\Models\FasExecutionRun;
 use App\Models\FasRankingRun;
 use App\Models\Fixture;
 use Carbon\Carbon;
@@ -25,7 +26,7 @@ class DashboardController extends Controller
         $rankingRun = FasRankingRun::with([
             'rankings.event.analysis.fixture.homeTeam',
             'rankings.event.analysis.fixture.awayTeam',
-            'rankings.event.audits',
+            'rankings.event.audit',
         ])
             ->whereDate('analysis_date', $date)
             ->latest('generated_at')
@@ -41,6 +42,14 @@ class DashboardController extends Controller
             $auditStats = $this->buildAuditStats($rankingRun);
         }
 
+        // Descoberta de jogos do dia (persistida)
+        $gameDayRun = FasExecutionRun::where('execution_type', 'GAMEDAY_DISCOVERY')
+            ->whereDate('analysis_date', $date)
+            ->latest()
+            ->first();
+
+        $gameDayDiscovery = $gameDayRun && $gameDayRun->status === 'COMPLETED' ? $gameDayRun->summary : null;
+
         return view('dashboard', compact(
             'fixtures',
             'date',
@@ -49,14 +58,15 @@ class DashboardController extends Controller
             'dashboardSections',
             'canGenerate',
             'canAudit',
-            'statusText'
+            'statusText',
+            'gameDayDiscovery',
+            'gameDayRun'
         ));
     }
 
     public function buildDatasets(Request $request)
     {
         $date = $request->input('date', today()->toDateString());
-        // Since we are adding actions, let's call the console commands via Artisan for convenience.
         Artisan::call('fas:analyze', [
             'date' => $date,
             '--build-missing-dataset' => true,
@@ -106,7 +116,7 @@ class DashboardController extends Controller
         $rankingRun->load([
             'rankings.event.analysis.fixture.homeTeam',
             'rankings.event.analysis.fixture.awayTeam',
-            'rankings.event.audits',
+            'rankings.event.audit',
         ]);
 
         return view('audits.show', compact('rankingRun'));
@@ -128,8 +138,8 @@ class DashboardController extends Controller
             $unavailable = 0;
 
             foreach ($rankings as $ranking) {
-                $audit = $ranking->event->audits->where('fas_ranking_run_id', $rankingRun->id)->first();
-                if (! $audit) {
+                $audit = $ranking->event->audit;
+                if (! $audit || $audit->fas_ranking_run_id !== $rankingRun->id) {
                     $pending++;
 
                     continue;

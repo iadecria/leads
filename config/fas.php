@@ -210,4 +210,127 @@ return [
             '90-100' => [90, 100],
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | FAS Descoberta de Jogos do Dia
+    |--------------------------------------------------------------------------
+    |
+    | Etapa leve de agenda + relevância (sem research profundo).
+    | Usa OpenRouter Research/Web para encontrar jogos da data,
+    | filtra por competição e divide em Janela 1 (< 17:00) e Janela 2 (>= 17:00).
+    |
+    */
+    'discovery' => [
+        'version' => '1.0.0',
+        'timezone' => env('FAS_DISCOVERY_TIMEZONE', 'America/Sao_Paulo'),
+        'cutoff_time' => '17:00',
+        'max_per_window' => (int) env('FAS_DISCOVERY_MAX_PER_WINDOW', 10),
+
+        // Estimativa de custo por token (USD) — Gemini Flash 2.5
+        'cost_per_prompt_token' => 0.00000015,
+        'cost_per_completion_token' => 0.00000060,
+
+        // Níveis de competição
+        'tiers' => [
+            5 => [
+                'champions league',
+                'premier league',
+                'la liga',
+                'serie a',
+                'bundesliga',
+                'brasileirão',
+                'brasileirao',
+            ],
+            4 => [
+                'ligue 1',
+                'primeira liga',
+                'liga portugal',
+                'liga nos',
+                'eredivisie',
+                'mls',
+                'liga mx',
+                'championship',
+                'europa league',
+            ],
+            3 => [
+                'copa do brasil',
+                'fa cup',
+                'copa del rey',
+                'dfb pokal',
+                'coppa italia',
+                'coupe de france',
+                'taça de portugal',
+                'scottish premiership',
+                'jupiler pro league',
+                'belgian pro league',
+                'super lig',
+                'süper lig',
+                'superliga',
+                'conference league',
+                'sul-americana',
+                'sudamericana',
+                'ekstraklasa',
+                'allsvenskan',
+                'eliteserien',
+                'austrian bundesliga',
+                'swiss super league',
+            ],
+        ],
+
+        // Blocos de descoberta multi-busca (agenda leve, sem research profundo)
+        'blocks' => [
+            'europa_elite' => [
+                'label' => 'Europa Elite',
+                'competitions' => 'UEFA Champions League (incl. qualifying), UEFA Europa League (incl. qualifying), UEFA Conference League (incl. qualifying), Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Liga Portugal, Eredivisie, Championship',
+            ],
+            'brasil' => [
+                'label' => 'Brasil',
+                'competitions' => 'Brasileirão Série A, Copa do Brasil, Copa Sudamericana (Sul-Americana)',
+            ],
+            'americas' => [
+                'label' => 'Américas',
+                'competitions' => 'MLS, Liga MX, Argentina Primera División, and other FAS-eligible national leagues/cups',
+            ],
+        ],
+
+        'tier_scores' => [
+            5 => 50,
+            4 => 40,
+            3 => 30,
+        ],
+
+        // Bônus para fase final / mata-mata (quando disponível)
+        'knockout_bonus' => 15,
+        'knockout_patterns' => [
+            'final',
+            'semi',
+            'quarter',
+            'round of',
+            'oitavas',
+            'quartas',
+            'semifinal',
+        ],
+
+        // Competições / categorias excluídas
+        'excluded_patterns' => [
+            'libertadores',
+            'série b',
+            'serie b',
+            'amistoso',
+            'friendly',
+            'feminino',
+            'women',
+            'sub-2',
+            'sub 2',
+            'u23',
+            'u21',
+            'u19',
+            'reserve',
+            'youth',
+            'juniores',
+            'segunda liga',
+            'segunda divis',
+        ],
+    ],
 ];

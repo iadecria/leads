@@ -35,14 +35,18 @@
                         <label class="mb-2 block text-sm text-slate-400">Data</label>
                         <input type="date" x-model="selectedDate" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-base text-white outline-none focus:border-indigo-500 sm:w-56">
                     </div>
-                    <div class="grid grid-cols-2 gap-3 sm:w-auto">
-                        <button @click="runDaily" :disabled="isRunning || !canGenerate"
+                    <div class="grid grid-cols-1 gap-3 sm:w-auto sm:grid-cols-3">
+                        <button @click="searchGameDay" :disabled="isRunning || !canGenerate"
+                            class="rounded-xl bg-sky-600 px-5 py-3 font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50">
+                            BUSCAR JOGOS DO DIA
+                        </button>
+                        <button @click="runDaily" :disabled="isRunning || !canGenerate || !hasDiscoveredGames"
                             class="rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
-                            GERAR ANÁLISE
+                            RODAR FAS
                         </button>
                         <button @click="runAudit" :disabled="isRunning || !canAudit"
                             class="rounded-xl bg-emerald-600 px-5 py-3 font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
-                            CONFERIR ANÁLISE
+                            CONFERIR
                         </button>
                     </div>
                 </div>
@@ -51,6 +55,38 @@
                     <span class="font-medium text-slate-100">Status:</span>
                     <span x-text="statusText || '{{ $statusText }}'"></span>
                 </div>
+            </div>
+        </section>
+
+        <section x-show="gameDay && gameDay.selected_count > 0" class="mb-4 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-lg">
+            <div class="mb-4 flex items-center justify-between">
+                <h2 class="text-lg font-semibold">Jogos do Dia</h2>
+            </div>
+            <div class="space-y-4">
+                <div class="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                    <h3 class="mb-3 font-semibold text-sky-300">JOGOS ATÉ 17H (Janela 1)</h3>
+                    <template x-for="(game, i) in gameDay?.window_1 || []" :key="i">
+                        <div class="flex justify-between rounded-xl bg-slate-900 px-3 py-2 text-sm">
+                            <span x-text="(i + 1) + '. ' + game.home_team + ' x ' + game.away_team"></span>
+                            <span class="text-xs text-slate-400" x-text="game.kickoff_time + ' · ' + game.competition"></span>
+                        </div>
+                    </template>
+                    <p x-show="!gameDay?.window_1?.length" class="text-sm text-slate-500">Sem jogos até 17h.</p>
+                </div>
+                <div class="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                    <h3 class="mb-3 font-semibold text-indigo-300">JOGOS APÓS 17H (Janela 2)</h3>
+                    <template x-for="(game, i) in gameDay?.window_2 || []" :key="i">
+                        <div class="flex justify-between rounded-xl bg-slate-900 px-3 py-2 text-sm">
+                            <span x-text="(i + 1) + '. ' + game.home_team + ' x ' + game.away_team"></span>
+                            <span class="text-xs text-slate-400" x-text="game.kickoff_time + ' · ' + game.competition"></span>
+                        </div>
+                    </template>
+                    <p x-show="!gameDay?.window_2?.length" class="text-sm text-slate-500">Sem jogos após 17h.</p>
+                </div>
+            </div>
+            <div class="mt-4 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-slate-400">
+                <span class="font-medium text-slate-300">Descoberta:</span>
+                <span x-text="(gameDay?.fixtures_eligible || 0) + ' jogos · ' + (gameDay?.tokens || 0) + ' tokens · US$ ' + (gameDay?.estimated_cost_usd || '0')"></span>
             </div>
         </section>
 
@@ -174,6 +210,54 @@
                 error: '',
                 summary: null,
                 pollingInterval: null,
+                gameDay: @json($gameDayDiscovery ?? null),
+
+                get hasDiscoveredGames() {
+                    return (this.gameDay?.selected_count || 0) > 0;
+                },
+
+                searchGameDay() {
+                    this.resetState();
+                    this.statusText = 'Buscando jogos do dia...';
+                    this.isRunning = true;
+
+                    fetch('/gameday/search', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify({ date: this.selectedDate })
+                    })
+                    .then(async res => {
+                        const raw = await res.text();
+                        let body = null;
+                        try {
+                            body = raw ? JSON.parse(raw) : null;
+                        } catch (e) {
+                            body = { raw };
+                        }
+                        return { status: res.status, body };
+                    })
+                    .then(res => {
+                        this.isRunning = false;
+                        if (res.status >= 400) {
+                            this.error = res.body?.error || res.body?.raw || 'Erro ao buscar jogos.';
+                            this.statusText = 'Erro';
+                            return;
+                        }
+
+                        this.gameDay = res.body.result;
+                        this.message = res.body.message || 'Busca concluída.';
+                        this.statusText = 'Descoberta concluída.';
+                    })
+                    .catch(() => {
+                        this.isRunning = false;
+                        this.error = 'Falha de rede ao buscar jogos.';
+                        this.statusText = 'Erro de rede';
+                    });
+                },
 
                 runDaily() {
                     this.startRun('/fas/executions/daily', 'DAILY_ANALYSIS', 'Pesquisando jogos...');
