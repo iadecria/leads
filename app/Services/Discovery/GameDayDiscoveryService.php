@@ -176,6 +176,7 @@ class GameDayDiscoveryService
                 ['id' => 'web'],
             ],
             'search_strategy' => 'WEB_PLUGIN',
+            'max_tokens' => config('openrouter.discovery_max_tokens', 8000),
             'response_format' => [
                 'type' => 'json_schema',
                 'json_schema' => [

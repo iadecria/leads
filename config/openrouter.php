@@ -14,6 +14,7 @@ return [
     'max_searches_per_fixture' => (int) env('OPENROUTER_MAX_SEARCHES_PER_FIXTURE', 3),
     'temperature' => (float) env('OPENROUTER_TEMPERATURE', 0.1),
     'max_tokens' => (int) env('OPENROUTER_MAX_TOKENS', 1200),
+    'discovery_max_tokens' => (int) env('OPENROUTER_DISCOVERY_MAX_TOKENS', 8000),
     'engine' => env('OPENROUTER_SEARCH_ENGINE', 'parallel'),
     'search_context_size' => env('OPENROUTER_SEARCH_CONTEXT_SIZE', 'turbo'),
     'app_name' => env('OPENROUTER_APP_NAME', config('app.name')),
