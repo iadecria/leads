@@ -165,4 +165,72 @@ class GameDayDiscoveryEndpointTest extends TestCase
         $response->assertSee('BUSCAR JOGOS DO DIA');
         $response->assertSee('RODAR FAS');
     }
+
+    public function test_discovery_with_fixtures_renders_games_and_enables_fas(): void
+    {
+        $this->fakeAllBlocks([$this->plFixture('Arsenal', 'Chelsea')]);
+
+        $date = now()->addDays(1)->format('Y-m-d');
+
+        // Discovery persiste
+        $this->postJson('/gameday/search', ['date' => $date])->assertStatus(200);
+
+        // Dashboard carrega os fixtures persistidos
+        $response = $this->get('/dashboard?date='.$date);
+
+        $response->assertStatus(200);
+        $response->assertSee('Jogos do Dia');
+        $response->assertSee('JOGOS ATÉ 17H (Janela 1)');
+        $response->assertSee('JOGOS APÓS 17H (Janela 2)');
+        // Os nomes dos times estão no JSON injetado no Alpine
+        $response->assertSee('Arsenal');
+        $response->assertSee('Chelsea');
+        // Contadores da descoberta
+        $response->assertSee('Europa:');
+        $response->assertSee('Eligible:');
+        $response->assertSee('RODAR FAS');
+        // hasDiscoveredGames = fixtures_eligible > 0, então RODAR FAS habilitado
+        $response->assertSee('disabled:cursor-not-allowed disabled:opacity-50');
+    }
+
+    public function test_empty_discovery_ephemeral_shows_empty_message(): void
+    {
+        $this->fakeAllBlocks([]);
+
+        $date = now()->addDays(1)->format('Y-m-d');
+
+        $this->postJson('/gameday/search', ['date' => $date])->assertStatus(200);
+
+        // Dashboard mostra estado EMPTY
+        $response = $this->get('/dashboard?date='.$date);
+
+        $response->assertStatus(200);
+        $response->assertSee('Jogos do Dia');
+        $response->assertSee('JOGOS ATÉ 17H (Janela 1)');
+        $response->assertSee('JOGOS APÓS 17H (Janela 2)');
+        $response->assertSee('Sem jogos elegíveis nesta janela.');
+        $response->assertSee('DISCOVERY_EMPTY');
+    }
+
+    public function test_discovery_fixtures_survive_empty_ranking(): void
+    {
+        $this->fakeAllBlocks([$this->plFixture('Flamengo', 'Gremio')]);
+
+        $date = now()->addDays(2)->format('Y-m-d');
+
+        // Discovery persiste (ranking vazio — sem FasRankingRun)
+        $this->postJson('/gameday/search', ['date' => $date])->assertStatus(200);
+
+        // Dashboard sem ranking mas com fixtures descobertos
+        $response = $this->get('/dashboard?date='.$date);
+
+        $response->assertStatus(200);
+        $response->assertSee('Jogos do Dia');
+        $response->assertSee('Flamengo');
+        $response->assertSee('Gremio');
+        $response->assertSee('RODAR FAS');
+        // Sem TOP3 determinístico mas com fixtures — jogos continuam aparecendo
+        $response->assertSee('Nenhum TOP 3 disponível para esta data.');
+        $response->assertSee('Nenhum TOP 5 disponível para esta data.');
+    }
 }

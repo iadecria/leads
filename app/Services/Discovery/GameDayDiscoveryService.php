@@ -47,11 +47,13 @@ class GameDayDiscoveryService
             'date' => $selectedDate->toDateString(),
             'cutoff_at' => $cutoffAt,
             'is_today' => $isToday,
+            'discovery_status' => count($eligible) > 0 ? 'DISCOVERY_SUCCESS' : 'DISCOVERY_EMPTY',
 
             // Debug por bloco
             'discovery_europa' => $blockResults['counts']['europa_elite'],
             'discovery_brasil' => $blockResults['counts']['brasil'],
             'discovery_americas' => $blockResults['counts']['americas'],
+            'block_debug' => $blockResults['debug_list'],
 
             'merged' => $merged,
             'deduplicated' => $deduplicated,

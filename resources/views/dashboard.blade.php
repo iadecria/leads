@@ -58,9 +58,14 @@
             </div>
         </section>
 
-        <section x-show="gameDay && gameDay.selected_count > 0" class="mb-4 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-lg">
+        <section x-show="gameDay" class="mb-4 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-lg">
             <div class="mb-4 flex items-center justify-between">
-                <h2 class="text-lg font-semibold">Jogos do Dia</h2>
+                <div>
+                    <h2 class="text-lg font-semibold">Jogos do Dia</h2>
+                    <p x-show="gameDay?.discovery_status === 'DISCOVERY_SUCCESS'" class="text-xs text-emerald-400" x-text="'Busca concluída: ' + (gameDay?.fixtures_eligible || 0) + ' jogos elegíveis encontrados.'"></p>
+                    <p x-show="!gameDay?.fixtures_eligible || gameDay?.fixtures_eligible === 0" class="text-xs text-amber-400" x-text="'Busca concluída, mas nenhum jogo elegível foi encontrado.'"></p>
+                </div>
+                <span class="text-xs text-slate-400" x-text="gameDay?.date || ''"></span>
             </div>
             <div class="space-y-4">
                 <div class="rounded-xl border border-slate-800 bg-slate-950 p-4">
@@ -71,7 +76,7 @@
                             <span class="text-xs text-slate-400" x-text="game.kickoff_time + ' · ' + game.competition"></span>
                         </div>
                     </template>
-                    <p x-show="!gameDay?.window_1?.length" class="text-sm text-slate-500">Sem jogos até 17h.</p>
+                    <p x-show="!gameDay?.window_1?.length" class="text-sm text-slate-500">Sem jogos elegíveis nesta janela.</p>
                 </div>
                 <div class="rounded-xl border border-slate-800 bg-slate-950 p-4">
                     <h3 class="mb-3 font-semibold text-indigo-300">JOGOS APÓS 17H (Janela 2)</h3>
@@ -81,12 +86,19 @@
                             <span class="text-xs text-slate-400" x-text="game.kickoff_time + ' · ' + game.competition"></span>
                         </div>
                     </template>
-                    <p x-show="!gameDay?.window_2?.length" class="text-sm text-slate-500">Sem jogos após 17h.</p>
+                    <p x-show="!gameDay?.window_2?.length" class="text-sm text-slate-500">Sem jogos elegíveis nesta janela.</p>
                 </div>
             </div>
-            <div class="mt-4 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-slate-400">
-                <span class="font-medium text-slate-300">Descoberta:</span>
-                <span x-text="(gameDay?.fixtures_eligible || 0) + ' jogos · ' + (gameDay?.tokens || 0) + ' tokens · US$ ' + (gameDay?.estimated_cost_usd || '0')"></span>
+            <div class="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-slate-400 sm:grid-cols-4">
+                <div><span class="font-medium text-slate-300">Europa:</span> <span x-text="gameDay?.discovery_europa || 0"></span></div>
+                <div><span class="font-medium text-slate-300">Brasil:</span> <span x-text="gameDay?.discovery_brasil || 0"></span></div>
+                <div><span class="font-medium text-slate-300">Américas:</span> <span x-text="gameDay?.discovery_americas || 0"></span></div>
+                <div><span class="font-medium text-slate-300">Eligible:</span> <span x-text="gameDay?.fixtures_eligible || 0"></span></div>
+                <div><span class="font-medium text-slate-300">Janela 1:</span> <span x-text="(gameDay?.window_1 || []).length"></span></div>
+                <div><span class="font-medium text-slate-300">Janela 2:</span> <span x-text="(gameDay?.window_2 || []).length"></span></div>
+                <div><span class="font-medium text-slate-300">Calls:</span> <span x-text="gameDay?.calls || 0"></span></div>
+                <div><span class="font-medium text-slate-300">Tokens:</span> <span x-text="gameDay?.tokens || 0"></span></div>
+                <div class="col-span-2"><span class="font-medium text-slate-300">Custo:</span> <span x-text="'US$ ' + (gameDay?.estimated_cost_usd || '0')"></span></div>
             </div>
         </section>
 
@@ -296,7 +308,7 @@
                 researchDebug: @json($researchDebug ?? null),
 
                 get hasDiscoveredGames() {
-                    return (this.gameDay?.selected_count || 0) > 0;
+                    return (this.gameDay?.fixtures_eligible || 0) > 0;
                 },
 
                 searchGameDay() {
