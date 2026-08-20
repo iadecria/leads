@@ -228,6 +228,110 @@ class ResearchFasAgentTest extends TestCase
         $response->assertJson(['error' => 'Nenhum jogo descoberto para esta data. Execute BUSCAR JOGOS DO DIA primeiro.']);
     }
 
+    public function test_research_uses_last_success_run_even_when_later_empty_exists(): void
+    {
+        $this->fakeAgentResponse();
+
+        $date = now()->addDays(2)->format('Y-m-d');
+
+        // Run A — SUCCESS com fixtures
+        $successRun = FasExecutionRun::create([
+            'execution_type' => 'GAMEDAY_DISCOVERY',
+            'analysis_date' => $date,
+            'status' => 'COMPLETED',
+            'summary' => [
+                'discovery_status' => 'DISCOVERY_SUCCESS',
+                'fixtures_eligible' => 5,
+                'selected_count' => 5,
+                'window_1' => [
+                    ['competition' => 'UEFA Europa League', 'home_team' => 'Benfica', 'away_team' => 'AGF', 'kickoff' => $date.' 16:00', 'kickoff_time' => '16:00', 'window' => 1],
+                    ['competition' => 'UEFA Europa League', 'home_team' => 'Kairat', 'away_team' => 'Anderlecht', 'kickoff' => $date.' 14:00', 'kickoff_time' => '14:00', 'window' => 1],
+                ],
+                'window_2' => [],
+            ],
+        ]);
+        $successRun->update(['created_at' => now()->subHour(), 'updated_at' => now()->subHour()]);
+
+        // Run B — EMPTY posterior (não deve bloquear o RODAR FAS)
+        $emptyRun = FasExecutionRun::create([
+            'execution_type' => 'GAMEDAY_DISCOVERY',
+            'analysis_date' => $date,
+            'status' => 'COMPLETED',
+            'summary' => [
+                'discovery_status' => 'DISCOVERY_EMPTY',
+                'fixtures_eligible' => 0,
+                'selected_count' => 0,
+                'window_1' => [],
+                'window_2' => [],
+            ],
+        ]);
+        $emptyRun->update(['created_at' => now(), 'updated_at' => now()]);
+
+        $response = $this->postJson('/fas/research/run', ['date' => $date]);
+
+        // NÃO deve retornar 422 — deve usar o SUCCESS anterior
+        $response->assertStatus(200);
+        $response->assertJsonStructure(['message', 'run_id', 'status', 'result', 'debug']);
+    }
+
+    public function test_failed_new_attempt_keeps_last_success_in_dashboard(): void
+    {
+        $date = now()->addDays(2)->format('Y-m-d');
+
+        // Run A — SUCCESS com fixtures
+        $successRun = FasExecutionRun::create([
+            'execution_type' => 'GAMEDAY_DISCOVERY',
+            'analysis_date' => $date,
+            'status' => 'COMPLETED',
+            'summary' => [
+                'discovery_status' => 'DISCOVERY_SUCCESS',
+                'discovery_europa' => 5,
+                'discovery_brasil' => 0,
+                'discovery_americas' => 0,
+                'fixtures_eligible' => 5,
+                'selected_count' => 5,
+                'window_1' => [
+                    ['competition' => 'UEFA Europa League', 'home_team' => 'Benfica', 'away_team' => 'AGF', 'kickoff' => $date.' 16:00', 'kickoff_time' => '16:00', 'window' => 1],
+                    ['competition' => 'UEFA Europa League', 'home_team' => 'Kairat', 'away_team' => 'Anderlecht', 'kickoff' => $date.' 14:00', 'kickoff_time' => '14:00', 'window' => 1],
+                    ['competition' => 'UEFA Europa League', 'home_team' => 'Trabzonspor', 'away_team' => 'Ferencvaros', 'kickoff' => $date.' 17:00', 'kickoff_time' => '17:00', 'window' => 1],
+                    ['competition' => 'UEFA Conference League', 'home_team' => 'Dinamo', 'away_team' => 'Pafos', 'kickoff' => $date.' 17:30', 'kickoff_time' => '17:30', 'window' => 1],
+                    ['competition' => 'UEFA Conference League', 'home_team' => 'Getafe', 'away_team' => 'Partizan', 'kickoff' => $date.' 18:00', 'kickoff_time' => '18:00', 'window' => 1],
+                ],
+                'window_2' => [],
+                'calls' => 3,
+                'tokens' => 10000,
+                'estimated_cost_usd' => 0.005,
+            ],
+        ]);
+        $successRun->update(['created_at' => now()->subHour(), 'updated_at' => now()->subHour()]);
+
+        // Run B — FAILED posterior
+        $failedRun = FasExecutionRun::create([
+            'execution_type' => 'GAMEDAY_DISCOVERY',
+            'analysis_date' => $date,
+            'status' => 'FAILED',
+            'summary' => [
+                'discovery_status' => 'DISCOVERY_FAILED',
+                'fixtures_eligible' => 0,
+                'selected_count' => 0,
+                'window_1' => [],
+                'window_2' => [],
+            ],
+        ]);
+        $failedRun->update(['created_at' => now(), 'updated_at' => now()]);
+
+        // Dashboard deve continuar mostrando o SUCCESS
+        $response = $this->get('/dashboard?date='.$date);
+
+        $response->assertStatus(200);
+        $response->assertSee('Benfica');
+        $response->assertSee('Trabzonspor');
+        $response->assertSee('DISCOVERY_SUCCESS');
+        $response->assertSee('RODAR FAS');
+        // Não mostra o failed como resultado
+        $response->assertDontSee('DISCOVERY_FAILED');
+    }
+
     public function test_snapshot_is_persisted(): void
     {
         $this->fakeAgentResponse();

@@ -29,12 +29,30 @@ class ResearchFasController extends Controller
             ], 422);
         }
 
-        // Pega a descoberta já persistida
+        // Pega a descoberta já persistida — prioriza último DISCOVERY_SUCCESS
         $discoveryRun = FasExecutionRun::where('execution_type', 'GAMEDAY_DISCOVERY')
             ->whereDate('analysis_date', $date->format('Y-m-d'))
             ->where('status', 'COMPLETED')
-            ->latest()
-            ->first();
+            ->orderByDesc('id')
+            ->get()
+            ->first(function ($run) {
+                $summary = $run->summary;
+
+                return is_array($summary) && ($summary['discovery_status'] ?? '') === 'DISCOVERY_SUCCESS';
+            });
+
+        // Fallback: qualquer run com fixtures (para compatibilidade com snapshots antigos sem discovery_status)
+        if (! $discoveryRun) {
+            $discoveryRun = FasExecutionRun::where('execution_type', 'GAMEDAY_DISCOVERY')
+                ->whereDate('analysis_date', $date->format('Y-m-d'))
+                ->where('status', 'COMPLETED')
+                ->get()
+                ->first(function ($run) {
+                    $summary = $run->summary;
+
+                    return is_array($summary) && (! empty($summary['window_1'] ?? []) || ! empty($summary['window_2'] ?? []));
+                });
+        }
 
         if (! $discoveryRun || empty($discoveryRun->summary['window_1'] ?? []) && empty($discoveryRun->summary['window_2'] ?? [])) {
             return response()->json([

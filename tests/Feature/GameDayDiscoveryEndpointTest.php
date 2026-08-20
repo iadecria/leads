@@ -306,6 +306,49 @@ class GameDayDiscoveryEndpointTest extends TestCase
         $response->assertSee('RODAR FAS');
     }
 
+    public function test_dashboard_keeps_success_after_new_search_returns_422(): void
+    {
+        $date = now()->addDays(1)->format('Y-m-d');
+
+        // Run A — SUCCESS com fixtures
+        $successRun = FasExecutionRun::create([
+            'execution_type' => 'GAMEDAY_DISCOVERY',
+            'analysis_date' => $date,
+            'status' => 'COMPLETED',
+            'summary' => [
+                'discovery_status' => 'DISCOVERY_SUCCESS',
+                'fixtures_eligible' => 2,
+                'selected_count' => 2,
+                'window_1' => [
+                    $this->plFixture('Benfica', 'AGF', '16:00'),
+                    $this->plFixture('Kairat', 'Anderlecht', '14:00'),
+                ],
+                'window_2' => [],
+            ],
+        ]);
+        $successRun->update(['created_at' => now()->subHour(), 'updated_at' => now()->subHour()]);
+
+        // Run B — RUNNING (nova busca retorna 422 de concorrência)
+        $runningRun = FasExecutionRun::create([
+            'execution_type' => 'GAMEDAY_DISCOVERY',
+            'analysis_date' => $date,
+            'status' => 'RUNNING',
+            'updated_at' => now(),
+        ]);
+
+        // Nova POST /gameday/search retorna 422
+        $response = $this->postJson('/gameday/search', ['date' => $date]);
+        $response->assertStatus(422);
+        $response->assertJson(['error' => 'Já existe uma busca em andamento para esta data.']);
+
+        // Dashboard continua mostrando Run A (SUCCESS)
+        $dashboard = $this->get('/dashboard?date='.$date);
+        $dashboard->assertStatus(200);
+        $dashboard->assertSee('Benfica');
+        $dashboard->assertSee('DISCOVERY_SUCCESS');
+        $dashboard->assertSee('RODAR FAS');
+    }
+
     public function test_discovery_fixtures_survive_empty_ranking(): void
     {
         $this->fakeAllBlocks([$this->plFixture('Flamengo', 'Gremio')]);
