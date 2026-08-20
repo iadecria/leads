@@ -42,13 +42,28 @@ class DashboardController extends Controller
             $auditStats = $this->buildAuditStats($rankingRun);
         }
 
-        // Descoberta de jogos do dia (persistida)
+        // Descoberta de jogos do dia (persistida) — prioriza último SUCCESS
         $gameDayRun = FasExecutionRun::where('execution_type', 'GAMEDAY_DISCOVERY')
             ->whereDate('analysis_date', $date)
-            ->latest()
-            ->first();
+            ->where('status', 'COMPLETED')
+            ->orderByDesc('id')
+            ->get()
+            ->first(function ($run) {
+                $summary = $run->summary;
 
-        $gameDayDiscovery = $gameDayRun && $gameDayRun->status === 'COMPLETED' ? $gameDayRun->summary : null;
+                return is_array($summary) && ($summary['discovery_status'] ?? '') === 'DISCOVERY_SUCCESS';
+            });
+
+        // Se nenhum SUCCESS, cai para o último run completo (para mostrar estado EMPTY quando apropriado)
+        if (! $gameDayRun) {
+            $gameDayRun = FasExecutionRun::where('execution_type', 'GAMEDAY_DISCOVERY')
+                ->whereDate('analysis_date', $date)
+                ->where('status', 'COMPLETED')
+                ->latest()
+                ->first();
+        }
+
+        $gameDayDiscovery = $gameDayRun ? $gameDayRun->summary : null;
 
         // Análise do Research Agent (persistida)
         $researchRun = ResearchFasRun::whereDate('analysis_date', $date)

@@ -212,6 +212,100 @@ class GameDayDiscoveryEndpointTest extends TestCase
         $response->assertSee('DISCOVERY_EMPTY');
     }
 
+    public function test_dashboard_prefers_last_success_over_later_empty(): void
+    {
+        $date = now()->addDays(2)->format('Y-m-d');
+
+        // Run A — SUCCESS com 5 fixtures (mais antigo)
+        $successRun = FasExecutionRun::create([
+            'execution_type' => 'GAMEDAY_DISCOVERY',
+            'analysis_date' => $date,
+            'status' => 'COMPLETED',
+            'summary' => [
+                'date' => $date,
+                'discovery_status' => 'DISCOVERY_SUCCESS',
+                'discovery_europa' => 5,
+                'discovery_brasil' => 0,
+                'discovery_americas' => 0,
+                'fixtures_eligible' => 5,
+                'selected_count' => 5,
+                'window_1' => [
+                    $this->plFixture('Arsenal', 'Chelsea'),
+                    $this->plFixture('Benfica', 'AGF', '16:00'),
+                ],
+                'window_2' => [],
+                'calls' => 3,
+                'tokens' => 10000,
+                'estimated_cost_usd' => 0.005,
+            ],
+        ]);
+        $successRun->update(['created_at' => now()->subHour(), 'updated_at' => now()->subHour()]);
+
+        // Run B — EMPTY mais recente (não deve esconder Run A)
+        $emptyRun = FasExecutionRun::create([
+            'execution_type' => 'GAMEDAY_DISCOVERY',
+            'analysis_date' => $date,
+            'status' => 'COMPLETED',
+            'summary' => [
+                'date' => $date,
+                'discovery_status' => 'DISCOVERY_EMPTY',
+                'discovery_europa' => 0,
+                'discovery_brasil' => 0,
+                'discovery_americas' => 0,
+                'fixtures_eligible' => 0,
+                'selected_count' => 0,
+                'window_1' => [],
+                'window_2' => [],
+                'calls' => 3,
+                'tokens' => 5000,
+                'estimated_cost_usd' => 0.002,
+            ],
+        ]);
+        $emptyRun->update(['created_at' => now(), 'updated_at' => now()]);
+
+        $response = $this->get('/dashboard?date='.$date);
+
+        $response->assertStatus(200);
+        $response->assertSee('Arsenal');
+        $response->assertSee('Benfica');
+        $response->assertSee('DISCOVERY_SUCCESS');
+        $response->assertSee('RODAR FAS');
+        $response->assertDontSee('DISCOVERY_EMPTY');
+    }
+
+    public function test_dashboard_shows_empty_when_no_success_run_exists(): void
+    {
+        $date = now()->addDays(2)->format('Y-m-d');
+
+        FasExecutionRun::create([
+            'execution_type' => 'GAMEDAY_DISCOVERY',
+            'analysis_date' => $date,
+            'status' => 'COMPLETED',
+            'summary' => [
+                'date' => $date,
+                'discovery_status' => 'DISCOVERY_EMPTY',
+                'discovery_europa' => 0,
+                'discovery_brasil' => 0,
+                'discovery_americas' => 0,
+                'fixtures_eligible' => 0,
+                'selected_count' => 0,
+                'window_1' => [],
+                'window_2' => [],
+                'calls' => 3,
+                'tokens' => 5000,
+                'estimated_cost_usd' => 0.002,
+            ],
+        ]);
+
+        $response = $this->get('/dashboard?date='.$date);
+
+        $response->assertStatus(200);
+        $response->assertSee('Jogos do Dia');
+        $response->assertSee('DISCOVERY_EMPTY');
+        $response->assertSee('Sem jogos elegíveis nesta janela.');
+        $response->assertSee('RODAR FAS');
+    }
+
     public function test_discovery_fixtures_survive_empty_ranking(): void
     {
         $this->fakeAllBlocks([$this->plFixture('Flamengo', 'Gremio')]);
