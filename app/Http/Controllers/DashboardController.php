@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Enums\ConfidenceLevel;
-use App\Enums\RankingType;
 use App\Models\FasExecutionRun;
 use App\Models\FasRankingRun;
 use App\Models\Fixture;
+use App\Models\ResearchFasRun;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -50,6 +50,15 @@ class DashboardController extends Controller
 
         $gameDayDiscovery = $gameDayRun && $gameDayRun->status === 'COMPLETED' ? $gameDayRun->summary : null;
 
+        // Análise do Research Agent (persistida)
+        $researchRun = ResearchFasRun::whereDate('analysis_date', $date)
+            ->where('status', 'COMPLETED')
+            ->latest('generated_at')
+            ->first();
+
+        $researchResult = $researchRun?->result;
+        $researchDebug = $researchRun?->debug;
+
         return view('dashboard', compact(
             'fixtures',
             'date',
@@ -60,7 +69,9 @@ class DashboardController extends Controller
             'canAudit',
             'statusText',
             'gameDayDiscovery',
-            'gameDayRun'
+            'gameDayRun',
+            'researchResult',
+            'researchDebug'
         ));
     }
 

@@ -5,6 +5,7 @@ use App\Http\Controllers\FasExecutionController;
 use App\Http\Controllers\FixtureController;
 use App\Http\Controllers\GameDayDiscoveryController;
 use App\Http\Controllers\PerformanceController;
+use App\Http\Controllers\ResearchFasController;
 use App\Models\FasRankingRun;
 use Illuminate\Support\Facades\Route;
 
@@ -18,6 +19,11 @@ Route::prefix('gameday')->group(function () {
     Route::post('/search', [GameDayDiscoveryController::class, 'search'])->name('gameday.search');
     Route::get('/latest', [GameDayDiscoveryController::class, 'latest'])->name('gameday.latest');
     Route::get('/{run}/status', [GameDayDiscoveryController::class, 'status'])->name('gameday.status');
+});
+
+Route::prefix('fas/research')->group(function () {
+    Route::post('/run', [ResearchFasController::class, 'run'])->name('fas.research.run');
+    Route::get('/latest', [ResearchFasController::class, 'latest'])->name('fas.research.latest');
 });
 
 Route::prefix('fas/executions')->group(function () {

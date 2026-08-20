@@ -40,7 +40,7 @@
                             class="rounded-xl bg-sky-600 px-5 py-3 font-semibold text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50">
                             BUSCAR JOGOS DO DIA
                         </button>
-                        <button @click="runDaily" :disabled="isRunning || !canGenerate || !hasDiscoveredGames"
+                        <button @click="runResearch" :disabled="isRunning || !canGenerate || !hasDiscoveredGames"
                             class="rounded-xl bg-indigo-600 px-5 py-3 font-semibold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50">
                             RODAR FAS
                         </button>
@@ -90,9 +90,114 @@
             </div>
         </section>
 
+        <!-- RESULTADOS RESEARCH AGENT -->
+        <section x-show="researchResult" class="mb-4 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-lg">
+            <div class="mb-4 flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold">Top 3 FAS — Research Agent</h2>
+                    <p class="text-xs text-slate-500">Research Agent · Não calibrado</p>
+                </div>
+                <span class="text-xs text-slate-400">{{ $date }}</span>
+            </div>
+            <div class="space-y-3">
+                <template x-for="(item, i) in researchResult?.top3 || []" :key="i">
+                    <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <div class="font-semibold" x-text="'#' + (i + 1) + ' ' + top3Label(item)"></div>
+                                <div class="text-xs text-slate-400" x-text="top3Team(item) + ' · ' + top3Event(item)"></div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm font-bold text-emerald-300" x-text="Math.round((item.estimated_probability || 0) * 100) + '%'"></div>
+                                <div class="text-xs text-slate-500" x-text="item.confidence || ''"></div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <p x-show="!(researchResult?.top3 || []).length" class="text-sm text-slate-500">Nenhum TOP 3 gerado.</p>
+            </div>
+
+            <div class="mt-6 mb-3">
+                <h3 class="text-lg font-semibold">Top 5</h3>
+                <p class="text-xs text-slate-500">Research Agent · Não calibrado</p>
+            </div>
+            <div class="space-y-3">
+                <template x-for="(item, i) in researchResult?.top5 || []" :key="i">
+                    <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <div class="font-semibold" x-text="'#' + (i + 1) + ' ' + top3Label(item)"></div>
+                                <div class="text-xs text-slate-400" x-text="top3Team(item) + ' · ' + top3Event(item)"></div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm font-bold text-indigo-300" x-text="Math.round((item.estimated_probability || 0) * 100) + '%'"></div>
+                                <div class="text-xs text-slate-500" x-text="item.confidence || ''"></div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <p x-show="!(researchResult?.top5 || []).length" class="text-sm text-slate-500">Nenhum TOP 5 gerado.</p>
+            </div>
+
+            <div class="mt-6 mb-3">
+                <h3 class="text-lg font-semibold">Melhores Estatísticas</h3>
+                <p class="text-xs text-slate-500">Research Agent · Não calibrado</p>
+            </div>
+            <div class="space-y-4">
+                <template x-for="(game, gi) in researchResult?.best_games || []" :key="gi">
+                    <div class="rounded-2xl border border-slate-800 bg-slate-950 p-4">
+                        <div class="mb-3 flex items-start justify-between gap-3">
+                            <div>
+                                <div class="text-base font-semibold" x-text="game.home + ' x ' + game.away"></div>
+                                <div class="text-xs text-slate-400" x-text="game.competition || ''"></div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-xs uppercase text-slate-500">Eventos</div>
+                                <div class="text-lg font-bold text-amber-300" x-text="(game.events || []).length"></div>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <template x-for="(ev, ei) in game.events || []" :key="ei">
+                                <div class="flex items-center justify-between rounded-xl bg-slate-900 px-3 py-2 text-sm">
+                                    <span x-text="ev.label || ev.event_type"></span>
+                                    <span class="font-semibold text-emerald-300" x-text="Math.round((ev.estimated_probability || 0) * 100) + '%'"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+                <p x-show="!(researchResult?.best_games || []).length" class="text-sm text-slate-500">Nenhum jogo forte gerado.</p>
+            </div>
+
+            <div class="mt-6 mb-3">
+                <h3 class="text-lg font-semibold">Ranking dos Melhores Jogos</h3>
+                <p class="text-xs text-slate-500">Research Agent · Não calibrado</p>
+            </div>
+            <div class="space-y-3">
+                <template x-for="(r, ri) in researchResult?.ranking || []" :key="ri">
+                    <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <div class="font-semibold" x-text="(ri + 1) + '. ' + r.home + ' x ' + r.away"></div>
+                                <div class="text-xs text-slate-400" x-text="r.competition || ''"></div>
+                                <div class="mt-1 text-sm text-slate-300" x-text="r.summary || ''"></div>
+                            </div>
+                            <div class="text-right text-sm" x-text="rankingStrength(r.strength)"></div>
+                        </div>
+                    </div>
+                </template>
+                <p x-show="!(researchResult?.ranking || []).length" class="text-sm text-slate-500">Nenhum ranking gerado.</p>
+            </div>
+
+            <div x-show="researchDebug" class="mt-6 rounded-xl border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-slate-400">
+                <span class="font-medium text-slate-300">Debug:</span>
+                <span x-text="'input ' + (researchDebug?.fixtures_input || 0) + ' · analisados ' + (researchDebug?.fixtures_analyzed || 0) + ' · rejeitados ' + (researchDebug?.fixtures_rejected || 0) + ' · calls ' + (researchDebug?.openrouter_calls || 0) + ' · tokens ' + (researchDebug?.tokens || 0) + ' · US$ ' + (researchDebug?.cost_usd || '0')"></span>
+            </div>
+        </section>
+
         <section class="mb-4 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-lg">
             <div class="mb-4 flex items-center justify-between">
-                <h2 class="text-lg font-semibold">Top 3 FAS</h2>
+                <h2 class="text-lg font-semibold">Top 3 FAS (Engine Determinístico)</h2>
                 <span class="text-xs text-slate-400">{{ $rankingRun ? $rankingRun->analysis_date->format('d/m/Y') : $date }}</span>
             </div>
             <div class="space-y-3">
@@ -113,7 +218,7 @@
         </section>
 
         <section class="mb-4 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-lg">
-            <h2 class="mb-4 text-lg font-semibold">Top 5</h2>
+            <h2 class="mb-4 text-lg font-semibold">Top 5 (Engine Determinístico)</h2>
             <div class="space-y-3">
                 @forelse($dashboardSections['top5'] as $item)
                     <div class="rounded-xl border border-slate-800 bg-slate-950 p-3">
@@ -132,7 +237,7 @@
         </section>
 
         <section class="mb-4 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-lg">
-            <h2 class="mb-4 text-lg font-semibold">Melhores Estatísticas</h2>
+            <h2 class="mb-4 text-lg font-semibold">Melhores Estatísticas (Engine Determinístico)</h2>
             <div class="space-y-4">
                 @forelse($dashboardSections['best_games'] as $game)
                     <div class="rounded-2xl border border-slate-800 bg-slate-950 p-4">
@@ -158,30 +263,6 @@
                 @empty
                     <p class="text-sm text-slate-500">Nenhum jogo forte disponível nesta data.</p>
                 @endforelse
-            </div>
-        </section>
-
-        <section class="mb-4 rounded-2xl border border-slate-800 bg-slate-900 p-4 shadow-lg">
-            <h2 class="mb-4 text-lg font-semibold">Jogos por Horário</h2>
-            <div class="space-y-4">
-                @foreach(['MANHA' => 'Manhã', 'TARDE' => 'Tarde', 'NOITE' => 'Noite'] as $window => $label)
-                    <div class="rounded-xl border border-slate-800 bg-slate-950 p-4">
-                        <div class="mb-3 flex items-center justify-between">
-                            <h3 class="font-semibold">{{ $label }}</h3>
-                            <span class="text-xs text-slate-500">{{ count($dashboardSections['window_rankings'][$window] ?? []) }} eventos</span>
-                        </div>
-                        <div class="space-y-2">
-                            @forelse($dashboardSections['window_rankings'][$window] ?? [] as $item)
-                                <div class="flex items-center justify-between rounded-xl bg-slate-900 px-3 py-2 text-sm">
-                                    <span>{{ $item['home_team'] }} x {{ $item['away_team'] }}</span>
-                                    <span class="text-slate-300">{{ $item['event_type'] }}</span>
-                                </div>
-                            @empty
-                                <p class="text-sm text-slate-500">Sem eventos nesta janela.</p>
-                            @endforelse
-                        </div>
-                    </div>
-                @endforeach
             </div>
         </section>
 
@@ -211,6 +292,8 @@
                 summary: null,
                 pollingInterval: null,
                 gameDay: @json($gameDayDiscovery ?? null),
+                researchResult: @json($researchResult ?? null),
+                researchDebug: @json($researchDebug ?? null),
 
                 get hasDiscoveredGames() {
                     return (this.gameDay?.selected_count || 0) > 0;
@@ -255,6 +338,50 @@
                     .catch(() => {
                         this.isRunning = false;
                         this.error = 'Falha de rede ao buscar jogos.';
+                        this.statusText = 'Erro de rede';
+                    });
+                },
+
+                runResearch() {
+                    this.resetState();
+                    this.statusText = 'Analisando jogos com agente...';
+                    this.isRunning = true;
+
+                    fetch('/fas/research/run', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify({ date: this.selectedDate })
+                    })
+                    .then(async res => {
+                        const raw = await res.text();
+                        let body = null;
+                        try {
+                            body = raw ? JSON.parse(raw) : null;
+                        } catch (e) {
+                            body = { raw };
+                        }
+                        return { status: res.status, body };
+                    })
+                    .then(res => {
+                        this.isRunning = false;
+                        if (res.status >= 400) {
+                            this.error = res.body?.error || res.body?.raw || 'Erro na análise FAS.';
+                            this.statusText = 'Erro';
+                            return;
+                        }
+
+                        this.researchResult = res.body.result;
+                        this.researchDebug = res.body.debug;
+                        this.message = res.body.message || 'Análise concluída.';
+                        this.statusText = 'Análise concluída.';
+                    })
+                    .catch(() => {
+                        this.isRunning = false;
+                        this.error = 'Falha de rede na análise FAS.';
                         this.statusText = 'Erro de rede';
                     });
                 },
@@ -337,6 +464,26 @@
                                 }
                             });
                     }, 2000);
+                },
+
+                top3Team(item) {
+                    const game = (this.researchResult?.games || []).find(g => String(g.fixture_id) === String(item.fixture_id));
+                    return game ? (game.home + ' x ' + game.away) : ('Fixture ' + item.fixture_id);
+                },
+
+                top3Event(item) {
+                    const game = (this.researchResult?.games || []).find(g => String(g.fixture_id) === String(item.fixture_id));
+                    return (game?.competition || '') + ' · ' + (item.label || item.event_type);
+                },
+
+                top3Label(item) {
+                    const game = (this.researchResult?.games || []).find(g => String(g.fixture_id) === String(item.fixture_id));
+                    return game ? (game.home + ' x ' + game.away) : ('Fixture ' + item.fixture_id);
+                },
+
+                rankingStrength(strength) {
+                    const map = { 'VERY_HIGH': '🔥 Muito forte', 'HIGH': '🟢 Forte', 'MEDIUM': '🟡 Médio', 'LOW': '⚪ Fraco' };
+                    return map[strength] || strength || '';
                 },
 
                 resetState() {

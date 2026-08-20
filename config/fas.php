@@ -227,6 +227,18 @@ return [
         'cutoff_time' => '17:00',
         'max_per_window' => (int) env('FAS_DISCOVERY_MAX_PER_WINDOW', 10),
 
+        // Modo de análise: RESEARCH_AGENT | DETERMINISTIC_ENGINE
+        'analysis_mode' => env('FAS_ANALYSIS_MODE', 'RESEARCH_AGENT'),
+
+        'research_agent' => [
+            'model' => env('FAS_RESEARCH_AGENT_MODEL', env('OPENROUTER_RESEARCH_MODEL', 'google/gemini-2.5-flash:floor')),
+            'prompt_version' => '1.0.0',
+            'max_analyzed_fixtures' => 20,
+            'probability_source' => 'RESEARCH_AGENT',
+            'calibration_status' => 'UNCALIBRATED',
+            'timeout' => 90,
+        ],
+
         // Estimativa de custo por token (USD) — Gemini Flash 2.5
         'cost_per_prompt_token' => 0.00000015,
         'cost_per_completion_token' => 0.00000060,
